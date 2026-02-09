@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: temporal-poc-postgres
+    environment:
+      POSTGRES_USER: temporal_user
+      POSTGRES_PASSWORD: temporal_pass
+      POSTGRES_DB: temporal_ops
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal_user -d temporal_ops"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - temporal-network
+
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    container_name: temporal-poc-server
+    environment:
+      - DB=postgres12 # needed for enabling advanced visibility
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal_user
+      - POSTGRES_PWD=temporal_pass
+      - POSTGRES_SEEDS=postgres
+    ports:
+      - "7233:7233"  # gRPC endpoint
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - temporal-network
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./scripts/init-temporal.sh:/init-temporal.sh
+    post_start:
+      - command: ["sh", "-c", "/init-temporal.sh"]
+
+  temporal-ui:
+    image: temporalio/ui:2.21.3
+    container_name: temporal-poc-ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    networks:
+      - temporal-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: temporal-poc-api
+    environment:
+      DATABASE_URL: postgresql://temporal_user:temporal_pass@postgres:5432/temporal_ops
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      TEMPORAL_TASK_QUEUE: long-running-ops
+      SYSTEM_ID: NODE01
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    networks:
+      - temporal-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: temporal-poc-worker
+    environment:
+      DATABASE_URL: postgresql://temporal_user:temporal_pass@postgres:5432/temporal_ops
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      TEMPORAL_TASK_QUEUE: long-running-ops
+      SYSTEM_ID: NODE01
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    networks:
+      - temporal-network
+    restart: unless-stopped
+
+networks:
+  temporal-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
