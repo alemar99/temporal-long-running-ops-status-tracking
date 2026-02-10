@@ -27,7 +27,7 @@ Workflow status updates are implemented using a decorator pattern (`@track_opera
 2. After successful completion: RUNNING -> COMPLETED
 3. On workflow failure: RUNNING -> FAILED
 
-The `update_operation_status` activity performs direct database writes via SQLAlchemy. API endpoints query PostgreSQL directly for operation status without calling Temporal APIs.
+The `update_operation_status` local activity performs direct database writes via SQLAlchemy. API endpoints query PostgreSQL directly for operation status without calling Temporal APIs.
 
 ### Reconciliation Workflow
 

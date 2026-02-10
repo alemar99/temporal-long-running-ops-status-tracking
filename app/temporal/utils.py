@@ -39,7 +39,7 @@ def track_operation_status(func: Callable) -> Callable:
 
         try:
             workflow.logger.info(f"Starting workflow for operation {operation_uuid}")
-            await workflow.execute_activity(
+            await workflow.execute_local_activity(
                 update_operation_status,
                 UpdateStatusInput(
                     operation_uuid=operation_uuid, status=OperationStatus.RUNNING
@@ -50,7 +50,7 @@ def track_operation_status(func: Callable) -> Callable:
             result = await func(self, input)
 
             workflow.logger.info(f"Completed workflow for operation {operation_uuid}")
-            await workflow.execute_activity(
+            await workflow.execute_local_activity(
                 update_operation_status,
                 UpdateStatusInput(
                     operation_uuid=operation_uuid,
@@ -68,7 +68,7 @@ def track_operation_status(func: Callable) -> Callable:
             )
 
             error_message = str(e)
-            await workflow.execute_activity(
+            await workflow.execute_local_activity(
                 update_operation_status,
                 UpdateStatusInput(
                     operation_uuid=operation_uuid,
