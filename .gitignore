@@ -39,7 +39,3 @@ env/
 # Database
 *.db
 *.sqlite
-
-# Alembic
-alembic/versions/*.py
-!alembic/versions/.gitkeep
